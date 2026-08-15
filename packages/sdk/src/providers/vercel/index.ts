@@ -214,7 +214,7 @@ export function vercel(options: VercelOptions): VercelProvider {
       explicitVerification: true,
       managedCertificates: true,
       apexDomains: true,
-      wildcardDomains: false,
+      wildcardDomains: true,
     },
     async add({ hostname }, context) {
       try {

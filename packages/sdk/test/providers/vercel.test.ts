@@ -85,6 +85,29 @@ describe("Vercel adapter", () => {
     expect(mock.calls.every((call) => call.url.includes("teamId=team_123"))).toBe(true);
   });
 
+  test("attaches a wildcard hostname", async () => {
+    const wildcard = {
+      ...projectDomain,
+      name: "*.customer.com",
+      apexName: "customer.com",
+    };
+    const mock = mockFetch((url, init) => {
+      const method = init?.method ?? "GET";
+      if (url.pathname === "/v10/projects/prj_123/domains" && method === "POST")
+        return json(wildcard);
+      if (url.pathname === "/v6/domains/*.customer.com/config") return json(configuration);
+      return json({ error: { message: `Unhandled ${method} ${url.pathname}` } }, 500);
+    });
+    const client = createDomainClient({
+      provider: vercel({ token: "secret", projectId: "prj_123", fetch: mock.fetch }),
+    });
+
+    const added = await client.add("*.customer.com");
+
+    expect(added.hostname).toBe("*.customer.com");
+    expect(JSON.parse(String(mock.calls[0]?.init?.body))).toEqual({ name: "*.customer.com" });
+  });
+
   test("turns same-project duplicate add into get", async () => {
     const mock = setup({ addStatus: 400 });
     const client = createDomainClient({

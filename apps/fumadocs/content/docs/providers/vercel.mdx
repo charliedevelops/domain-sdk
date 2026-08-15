@@ -28,7 +28,7 @@ Routing records come from Vercel's domain-configuration recommendations; ownersh
 
 ## Errors and limitations
 
-Expired tokens map to `AUTHENTICATION_FAILED`; inaccessible resources map to `PERMISSION_DENIED`; another project/account maps to `DOMAIN_CONFLICT`; rate limits preserve `retryAfter`. Duplicate adds return current state only when `projectId` matches. Wildcards are not supported in v0.1.
+Expired tokens map to `AUTHENTICATION_FAILED`; inaccessible resources map to `PERMISSION_DENIED`; another project/account maps to `DOMAIN_CONFLICT`; rate limits preserve `retryAfter`. Duplicate adds return current state only when `projectId` matches. Wildcard hostnames such as `*.customer.com` are attached like any other domain; the apex must be verified on the account, and because the wildcard certificate is issued over DNS-01, the ownership record has to stay in place for issuance and renewal.
 
 Official references: [project domains](https://vercel.com/docs/rest-api/projects/add-a-domain-to-a-project), [verification](https://vercel.com/docs/rest-api/projects/verify-project-domain), and [domain configuration](https://vercel.com/docs/rest-api/domains/get-a-domain-s-configuration).
 
