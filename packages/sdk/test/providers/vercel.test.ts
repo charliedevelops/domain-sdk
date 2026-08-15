@@ -85,16 +85,23 @@ describe("Vercel adapter", () => {
     expect(mock.calls.every((call) => call.url.includes("teamId=team_123"))).toBe(true);
   });
 
-  test("attaches a wildcard hostname", async () => {
-    const wildcard = {
-      ...projectDomain,
-      name: "*.customer.com",
-      apexName: "customer.com",
-    };
+  test("covers the wildcard lifecycle", async () => {
+    const wildcardDomain = { ...projectDomain, name: "*.customer.com", apexName: "customer.com" };
     const mock = mockFetch((url, init) => {
       const method = init?.method ?? "GET";
       if (url.pathname === "/v10/projects/prj_123/domains" && method === "POST")
-        return json(wildcard);
+        return json(wildcardDomain);
+      if (url.pathname === "/v9/projects/prj_123/domains/*.customer.com/verify")
+        return json({ ...wildcardDomain, verified: true });
+      if (url.pathname === "/v9/projects/prj_123/domains/*.customer.com" && method === "DELETE")
+        return json("ok");
+      if (url.pathname === "/v9/projects/prj_123/domains/*.customer.com")
+        return json(wildcardDomain);
+      if (url.pathname === "/v9/projects/prj_123/domains")
+        return json({
+          domains: [wildcardDomain],
+          pagination: { count: 1, next: null, prev: null },
+        });
       if (url.pathname === "/v6/domains/*.customer.com/config") return json(configuration);
       return json({ error: { message: `Unhandled ${method} ${url.pathname}` } }, 500);
     });
@@ -103,9 +110,29 @@ describe("Vercel adapter", () => {
     });
 
     const added = await client.add("*.customer.com");
-
     expect(added.hostname).toBe("*.customer.com");
     expect(JSON.parse(String(mock.calls[0]?.init?.body))).toEqual({ name: "*.customer.com" });
+    expect((await client.get("*.customer.com")).hostname).toBe("*.customer.com");
+    expect((await client.refresh("*.customer.com")).hostname).toBe("*.customer.com");
+    const verified = await client.verify("*.customer.com");
+    expect(verified.hostname).toBe("*.customer.com");
+    expect(verified.verification.status).toBe("verified");
+    expect((await client.list()).domains.map((domain) => domain.hostname)).toEqual([
+      "*.customer.com",
+    ]);
+    await client.remove("*.customer.com");
+
+    const paths = mock.calls.map((call) => new URL(call.url).pathname);
+    expect(paths).toContain("/v9/projects/prj_123/domains/*.customer.com/verify");
+    expect(paths).toContain("/v6/domains/*.customer.com/config");
+    expect(paths.every((path) => !path.includes("%2A"))).toBe(true);
+    expect(
+      mock.calls.some(
+        (call) =>
+          call.init?.method === "DELETE" &&
+          new URL(call.url).pathname === "/v9/projects/prj_123/domains/*.customer.com",
+      ),
+    ).toBe(true);
   });
 
   test("turns same-project duplicate add into get", async () => {
